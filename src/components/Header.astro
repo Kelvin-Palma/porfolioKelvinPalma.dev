@@ -51,19 +51,40 @@ const navItems = [
 
 <script>
   document.addEventListener("astro:page-load", () => {
-    const sections = document.querySelectorAll("section")
+    const sections = document.querySelectorAll("section[id]")
     const navItems = document.querySelectorAll("header nav a")
 
-    const callback = (entries: any[]) => {
+    // Mapa para guardar el ratio de intersección de cada sección
+    const sectionRatios = new Map<string, number>()
+
+    const callback = (entries: IntersectionObserverEntry[]) => {
       entries.forEach((entry) => {
-        if (entry.isIntersecting) {
-          navItems.forEach((item) => {
-            if (item.getAttribute("aria-label") == entry.target.id) {
-              item.classList.add("text-blue-500")
-            } else {
-              item.classList.remove("text-blue-500")
-            }
-          })
+        const id = (entry.target as HTMLElement).id
+        if (id) {
+          sectionRatios.set(id, entry.intersectionRatio)
+        }
+      })
+
+      // Encontrar la sección con mayor ratio visible (mínimo 40% para resaltar)
+      let bestSection: string | null = null
+      let maxRatio = 0.4
+
+      sectionRatios.forEach((ratio, id) => {
+        if (ratio > maxRatio) {
+          maxRatio = ratio
+          bestSection = id
+        }
+      })
+
+      // Si estamos cerca del top (scroll < 5% del viewport), no resaltar nada
+      const nearTop = window.scrollY < window.innerHeight * 0.05
+      if (nearTop) bestSection = null
+
+      navItems.forEach((item) => {
+        if (item.getAttribute("aria-label") === bestSection) {
+          item.classList.add("text-blue-500")
+        } else {
+          item.classList.remove("text-blue-500")
         }
       })
     }
@@ -71,12 +92,21 @@ const navItems = [
     const observer = new IntersectionObserver(callback, {
       root: null,
       rootMargin: "0px",
-      threshold: 0.3,
+      threshold: [0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1],
     })
 
     sections.forEach((section) => {
       observer.observe(section)
     })
+
+    // Actualizar al hacer scroll cuando estamos cerca del top
+    const updateHighlight = () => {
+      const nearTop = window.scrollY < window.innerHeight * 0.05
+      if (nearTop) {
+        navItems.forEach((item) => item.classList.remove("text-blue-500"))
+      }
+    }
+    window.addEventListener("scroll", updateHighlight, { passive: true })
 
     // Cleanup function
     document.onvisibilitychange = () => {
